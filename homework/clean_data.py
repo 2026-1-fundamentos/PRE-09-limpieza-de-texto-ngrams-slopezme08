@@ -1,88 +1,60 @@
-"""Taller evaluable presencial"""
-
-import string
-#
-# Este codigo impolementa algoritmo 'fingerprint' para colision de textos, el
-# cual es utilizado para unificar cadenas de texto que representan la misma
-# entidad.
-#
-# Referencia:
-# https://openrefine.org/docs/technical-reference/clustering-in-depth
-#
-import nltk  # type: ignore
-import pandas as pd  # type: ignore
-
-def create_normalized_key(df):
-    """Cree una nueva columna en el DataFrame que contenga
-    el key de la columna 'raw_text'"""
-
-    df = df.copy()
-
-    # Copie la columna 'text' a la columna 'key'
-    df["key"] = df["raw_text"]
-
-    # Remueva los espacios en blanco al principio y al final de la cadena
-    df["key"] = df["key"].str.strip()
-
-    # Convierta el texto a minúsculas
-    df["key"] = df["key"].str.lower()
-
-    # Transforme palabras que pueden (o no) contener guiones por su
-    # version sin guion (este paso es redundante por la linea siguiente.
-    # Pero es claro anotar la existencia de palabras con y sin '-'.
-    df["key"] = df["key"].str.replace("-", "")
-
-    # Remueva puntuación y caracteres de control
-    df["key"] = df["key"].str.translate(
-        str.maketrans("", "", string.punctuation)
-    )
-
-    # Convierta el texto a una lista de tokens
-    df["key"] = df["key"].str.split()
-
-    # Transforme cada palabra con un stemmer de Porter
-    stemmer = nltk.PorterStemmer()
-    df["key"] = df["key"].apply(lambda x: [stemmer.stem(word) for word in x])
-
-    # Ordene la lista de tokens y remueve duplicados
-    df["key"] = df["key"].apply(lambda x: sorted(set(x)))
-
-    # Convierta la lista de tokens a una cadena de texto separada por espacios
-    df["key"] = df["key"].str.join(" ")
-
-    return df
-
-def generate_cleaned_text(df):
-    """Crea la columna 'cleaned_text' en el DataFrame"""
-
-    keys = df.copy()
-
-    # Ordene el dataframe por 'key' y 'text'
-    keys = keys.sort_values(by=["key", "raw_text"], ascending=[True, True])
-
-    # Seleccione la primera fila de cada grupo de 'key'
-    keys = df.drop_duplicates(subset="key", keep="first")
-
-    # Cree un diccionario con 'key' como clave y 'text' como valor
-    key_dict = dict(zip(keys["key"], keys["raw_text"]))
-
-    # Cree la columna 'cleaned' usando el diccionario
-    df["cleaned_text"] = df["key"].map(key_dict)
-
-    return df
-
-def main(input_file, output_file):
-    """Ejecuta la limpieza de datos"""
-
-    df = pd.read_csv(input_file)
-    df = create_normalized_key(df)
-    df = generate_cleaned_text(df)
-    df.to_csv("files/test.csv", index=False)
-    df[["raw_text", "cleaned_text"]].to_csv(output_file, index=False)
+# Carga de datos
+import glob
 
 
-if __name__ == "__main__":
-    main(
-        input_file="files/input.txt",
-        output_file="files/output.txt",
-    )
+def load_data(input_directory):
+
+    sequence = []
+    files = glob.glob(f"{input_directory}/*")
+    for file in files:
+        with open(file, "rt", encoding="utf-8") as f:
+            raw_text = f.read()
+            sequence.append((file, raw_text))
+    return sequence
+
+
+sequence = load_data(input_directory="../files/input")
+for file, text in sequence:
+    print(f"{file}  {text[:70]}")
+# Clean text
+import re
+
+
+def clean_text(sequence):
+    cleaned_sequence = []
+    for file, text in sequence:
+        cleaned_text = re.sub(r"\n", " ", text)
+        cleaned_text = re.sub(r"\s+", " ", cleaned_text)
+        cleaned_text = cleaned_text.strip()
+        cleaned_text = cleaned_text.lower()
+        cleaned_sequence.append((file, cleaned_text))
+    return cleaned_sequence
+
+
+sequence = load_data(input_directory="../files/input")
+cleaned_sequence = clean_text(sequence)
+for file, text in cleaned_sequence:
+    print(f"{file}  {text[:70]}")
+
+# Tokenization
+
+import nltk
+nltk.download("punkt_tab")
+from nltk.tokenize import word_tokenize
+
+
+
+
+def tokenize(sequence):
+    tokenized_sequence = []
+    for file, text in sequence:
+        tokens = word_tokenize(text)
+        tokenized_sequence.append((file, tokens))
+    return tokenized_sequence
+
+
+sequence = load_data(input_directory="../files/input")
+cleaned_sequence = clean_text(sequence)
+tokenized_sequence = tokenize(cleaned_sequence)
+for file, text in tokenized_sequence:
+    print(f"{file}  {' '.join(text)[:70]}")
